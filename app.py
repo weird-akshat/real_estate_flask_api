@@ -450,28 +450,22 @@ def createUser():
 
 @app.route('/add_property', methods=['POST'])
 def add_property():
-    if request.content_type == 'application/json':
+    print("Raw Request Data:", request.data)
+    print("Request Content Type:", request.content_type)
+
+    try:
         data = request.get_json(force=True)
-    else:
-        data = request.form
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
 
-    owner_id = data.get('owner_id')
-    property_type = data.get('property_type')
-    area = data.get('area')
-    parking = data.get('parking')
-    city = data.get('city')
-    state = data.get('state')
-    country = data.get('country')
-    price = data.get('price')
-    balcony = data.get('balcony')
-    bedrooms = data.get('bedrooms')
-    contact_number = data.get('contact_number')
-    email = data.get('email')
-    description = data.get('description')
-    status = data.get('status')
+    print("Parsed Data:", data)
 
-    if not all([owner_id, property_type, area, city, state, country, price, contact_number, email, status]):
-        return jsonify({"error": "Missing required fields"}), 400
+    required_fields = ["owner_id", "property_type", "area", "city", "state", "country", 
+                       "price", "contact_number", "email", "status"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     try:
         with db_connection() as conn:
@@ -481,12 +475,15 @@ def add_property():
                     owner_id, property_type, area, parking, city, state, country, price, 
                     balcony, bedrooms, contact_number, email, description, status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (owner_id, property_type, area, parking, city, state, country, price, 
-                  balcony, bedrooms, contact_number, email, description, status))
+            """, (data['owner_id'], data['property_type'], data['area'], data.get('parking'),
+                  data['city'], data['state'], data['country'], data['price'], 
+                  data.get('balcony'), data.get('bedrooms'), data['contact_number'], 
+                  data['email'], data.get('description'), data['status']))
             conn.commit()
         return jsonify({"message": "Property added successfully"}), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 @app.route('/get_property/<int:property_id>', methods=['GET'])
 def get_property(property_id):
     try:
