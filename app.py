@@ -397,20 +397,20 @@ def make_offer():
 
 @app.route('/create_user', methods=['POST'])
 def createUser():
-    if request.content_type == 'application/json':
-        data = request.get_json()
-    else:
-        data = request.form  
+    print("Raw Request Data:", request.data)  
+    print("Request Content Type:", request.content_type)  
+
+    try:
+        data = request.get_json(force=True)  
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
+
+    print("Parsed Data:", data)  
 
     missing_fields = []
-    if not data.get('user_id'):
-        missing_fields.append("user_id")
-    if not data.get('name'):
-        missing_fields.append("name")
-    if not data.get('email'):
-        missing_fields.append("email")
-    if not data.get('phone'):
-        missing_fields.append("phone")
+    for field in ["user_id", "name", "email", "phone"]:
+        if not data.get(field):
+            missing_fields.append(field)
 
     if missing_fields:
         return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
