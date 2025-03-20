@@ -400,20 +400,26 @@ def createUser():
     if request.content_type == 'application/json':
         data = request.get_json()
     else:
-        data = request.form  # Handle form-data requests too
+        data = request.form  
 
-    user_id = data.get('user_id')
-    name = data.get('name')
-    email = data.get('email')
-    phone = data.get('phone')
+    missing_fields = []
+    if not data.get('user_id'):
+        missing_fields.append("user_id")
+    if not data.get('name'):
+        missing_fields.append("name")
+    if not data.get('email'):
+        missing_fields.append("email")
+    if not data.get('phone'):
+        missing_fields.append("phone")
 
-    if not user_id or not name or not email or not phone:
-        return jsonify({"error": "Missing required fields"}), 400
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO users VALUES (?,?,?,?)", (user_id, name, email, phone))
+            cursor.execute("INSERT INTO users VALUES (?,?,?,?)", 
+                           (data['user_id'], data['name'], data['email'], data['phone']))
             conn.commit()
         return jsonify({"message": "User created successfully"}), 201
     except sqlite3.Error as e:
