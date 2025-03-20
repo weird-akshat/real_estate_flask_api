@@ -318,7 +318,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @app.route('/upload_image', methods=['POST'])
+@app.route('/upload_image', methods=['POST'])
 def upload_image():
+    print("Raw Request Data:", request.data)
+    print("Request Content Type:", request.content_type)
+
     if 'image' not in request.files or 'property_id' not in request.form:
         return jsonify({"error": "Missing image or property_id"}), 400
 
@@ -326,14 +330,14 @@ def upload_image():
     property_id = request.form['property_id']
     is_primary = request.form.get('is_primary', 'no')
 
-    if file.filename == '':
+    if not file or file.filename.strip() == '':
         return jsonify({"error": "No selected file"}), 400
 
-    filename = secure_filename(f"{property_id}_{file.filename}")  # Rename for uniqueness
+    filename = secure_filename(f"{property_id}_{file.filename}")
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
 
     try:
+        file.save(file_path)
         with db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -377,44 +381,43 @@ def get_property_images():
 # CORS handling
 @app.route('/make_offer', methods=['POST'])
 def make_offer():
-    if request.content_type == 'application/json':
-        data = request.get_json()
-    else:
-        data = request.form
+    print("Raw Request Data:", request.data)
+    print("Request Content Type:", request.content_type)
 
-    property_id = data.get('property_id')
-    buyer_id = data.get('buyer_id')
-    amount = data.get('amount')
-    made_by = data.get('made_by')  # Must be "buyer" or "owner"
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
 
-    if not property_id or not buyer_id or not amount or made_by not in ["buyer", "owner"]:
-        return jsonify({"error": "Missing required fields or invalid made_by"}), 400
+    print("Parsed Data:", data)
+
+    required_fields = ["property_id", "buyer_id", "amount", "made_by"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+
+    if missing_fields or data["made_by"] not in ["buyer", "owner"]:
+        return jsonify({"error": f"Missing required fields or invalid made_by: {', '.join(missing_fields)}"}), 400
 
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
 
-            # Ensure property exists
-            cursor.execute("SELECT * FROM properties WHERE property_id = ?", (property_id,))
+            cursor.execute("SELECT 1 FROM properties WHERE property_id = ?", (data["property_id"],))
             if cursor.fetchone() is None:
                 return jsonify({"error": "Property not found"}), 404
 
-            # Ensure user exists
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (buyer_id,))
+            cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (data["buyer_id"],))
             if cursor.fetchone() is None:
                 return jsonify({"error": "User not found"}), 404
 
-            # Insert offer with made_by field
             cursor.execute("""
                 INSERT INTO offers (property_id, buyer_id, amount, offer_status, made_by) 
                 VALUES (?, ?, ?, ?, ?)
-            """, (property_id, buyer_id, amount, "Pending", made_by))
+            """, (data["property_id"], data["buyer_id"], data["amount"], "Pending", data["made_by"]))
 
             conn.commit()
         return jsonify({"message": "Offer submitted successfully"}), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 @app.route('/create_user', methods=['POST'])
@@ -500,35 +503,36 @@ def get_property(property_id):
         return jsonify({"error": str(e)}), 500
 @app.route('/add_favorite', methods=['POST'])
 def add_favorite():
-    if request.content_type == 'application/json':
-        data = request.get_json()
-    else:
-        data = request.form  # Handle form-data requests too
+    print("Raw Request Data:", request.data)
+    print("Request Content Type:", request.content_type)
 
-    user_id = data.get('user_id')
-    property_id = data.get('property_id')
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
 
-    if not user_id or not property_id:
-        return jsonify({"error": "Missing required fields"}), 400
+    print("Parsed Data:", data)
+
+    required_fields = ["user_id", "property_id"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
 
-            # Check if the user exists
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+            cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (data["user_id"],))
             if cursor.fetchone() is None:
                 return jsonify({"error": "User not found"}), 404
 
-            # Check if the property exists
-            cursor.execute("SELECT * FROM properties WHERE property_id = ?", (property_id,))
+            cursor.execute("SELECT 1 FROM properties WHERE property_id = ?", (data["property_id"],))
             if cursor.fetchone() is None:
                 return jsonify({"error": "Property not found"}), 404
 
-            # Insert into favorites
-            cursor.execute("""
-                INSERT INTO favorites (user_id, property_id) VALUES (?, ?)
-            """, (user_id, property_id))
+            cursor.execute("INSERT INTO favorites (user_id, property_id) VALUES (?, ?)",
+                           (data["user_id"], data["property_id"]))
 
             conn.commit()
         return jsonify({"message": "Property added to favorites"}), 201
