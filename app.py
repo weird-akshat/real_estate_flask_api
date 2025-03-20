@@ -127,6 +127,28 @@ def get_properties_by_owner():
         return jsonify(property_list), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/delete_user/<string:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Fetch the user details before deletion
+            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+            user = cursor.fetchone()
+
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+
+            user_data = dict(user)
+
+            # Delete the user
+            cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            conn.commit()
+
+        return jsonify({"message": "User deleted successfully", "deleted_user": user_data}), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/update_property', methods=['PUT'])
 def update_property():
     if request.content_type == 'application/json':
