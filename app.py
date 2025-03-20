@@ -451,7 +451,7 @@ def createUser():
 @app.route('/add_property', methods=['POST'])
 def add_property():
     if request.content_type == 'application/json':
-        data = request.get_json()
+        data = request.get_json(force=True)
     else:
         data = request.form
 
