@@ -482,10 +482,12 @@ def add_property():
                   data['city'], data['state'], data['country'], data['price'], 
                   data.get('balcony'), data.get('bedrooms'), data['contact_number'], 
                   data['email'], data.get('description'), data['status']))
+            property_id = cursor.lastrowid
             conn.commit()
-        return jsonify({"message": "Property added successfully"}), 201
+        return jsonify({"message": "Property added successfully", "property_id": property_id}), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/get_property/<int:property_id>', methods=['GET'])
 def get_property(property_id):
