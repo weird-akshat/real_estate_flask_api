@@ -465,7 +465,7 @@ def add_property():
     print("Parsed Data:", data)
 
     required_fields = ["owner_id", "property_type", "area", "city", "state", "country", 
-                       "price", "contact_number", "email", "status"]
+                       "price", "contact_number", "email", "status", "name"]
     missing_fields = [field for field in required_fields if not data.get(field)]
 
     if missing_fields:
@@ -475,11 +475,11 @@ def add_property():
         with db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO properties (
+                INSERT INTO properties (name,
                     owner_id, property_type, area, parking, city, state, country, price, 
                     balcony, bedrooms, contact_number, email, description, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (data['owner_id'], data['property_type'], data['area'], data.get('parking'),
+                ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (data['name',data['owner_id'], data['property_type'], data['area'], data.get('parking'),
                   data['city'], data['state'], data['country'], data['price'], 
                   data.get('balcony'), data.get('bedrooms'), data['contact_number'], 
                   data['email'], data.get('description'), data['status']))
