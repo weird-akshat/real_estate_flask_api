@@ -452,6 +452,7 @@ def createUser():
         return jsonify({"error": str(e)}), 500
 
 
+
 @app.route('/add_property', methods=['POST'])
 def add_property():
     print("Raw Request Data:", request.data)
@@ -466,7 +467,7 @@ def add_property():
 
     required_fields = ["owner_id", "property_type", "area", "city", "state", "country", 
                        "price", "contact_number", "email", "status", "name"]
-    missing_fields = [field for field in required_fields if not data.get(field)]
+    missing_fields = [field for field in required_fields if field not in data or not data[field]]
 
     if missing_fields:
         return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
@@ -475,11 +476,10 @@ def add_property():
         with db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO properties (name,
-                    owner_id, property_type, area, parking, city, state, country, price, 
-                    balcony, bedrooms, contact_number, email, description, status
-                ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (data['name',data['owner_id'], data['property_type'], data['area'], data.get('parking'),
+                INSERT INTO properties (name, owner_id, property_type, area, parking, city, state, country, price, 
+                                       balcony, bedrooms, contact_number, email, description, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (data['name'], data['owner_id'], data['property_type'], data['area'], data.get('parking'),
                   data['city'], data['state'], data['country'], data['price'], 
                   data.get('balcony'), data.get('bedrooms'), data['contact_number'], 
                   data['email'], data.get('description'), data['status']))
@@ -488,6 +488,7 @@ def add_property():
         return jsonify({"message": "Property added successfully", "property_id": property_id}), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/get_property/<int:property_id>', methods=['GET'])
