@@ -241,6 +241,7 @@ def create_table():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS properties (
         property_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        name TEXT,
         owner_id TEXT, 
         property_type TEXT, 
         area TEXT, 
