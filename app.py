@@ -19,13 +19,8 @@ def db_connection():
 # Close the database connection at the end of each request
 @app.route('/remove_favorite', methods=['DELETE'])
 def remove_favorite():
-    if request.content_type == 'application/json':
-        data = request.get_json()
-    else:
-        data = request.form  # Handle form-data requests too
-
-    user_id = data.get('user_id')
-    property_id = data.get('property_id')
+    user_id = request.args.get('user_id')  # ✅ Use query parameters
+    property_id = request.args.get('property_id')
 
     if not user_id or not property_id:
         return jsonify({"error": "Missing required fields"}), 400
@@ -38,6 +33,7 @@ def remove_favorite():
         return jsonify({"message": "Property removed from favorites"}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
