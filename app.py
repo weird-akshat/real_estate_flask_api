@@ -378,6 +378,22 @@ def get_property_images():
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/get_favorite_properties/<string:user_id>', methods=['GET'])
+def get_favorite_properties(user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT p.* FROM properties p
+                INNER JOIN favorites f ON p.property_id = f.property_id
+                WHERE f.user_id = ?
+            """, (user_id,))
+            properties = cursor.fetchall()
+
+        property_list = [dict(property) for property in properties]
+        return jsonify(property_list), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
 
 # CORS handling
 @app.route('/make_offer', methods=['POST'])
