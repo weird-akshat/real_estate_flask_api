@@ -148,6 +148,30 @@ def delete_user(user_id):
         return jsonify({"message": "User deleted successfully", "deleted_user": user_data}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/offers/<string:buyer_id>/<int:property_id>", methods=["GET"])
+def get_offers(buyer_id, property_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM offers
+                WHERE buyer_id = ? AND property_id = ?
+                ORDER BY offer_date ASC
+                """,
+                (buyer_id, property_id),
+            )
+            offers = cursor.fetchall()
+            
+            if not offers:
+                return jsonify({"error": "No offers found"}), 404
+            
+            return jsonify([dict(offer) for offer in offers]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/update_property', methods=['PUT'])
 def update_property():
     if request.content_type == 'application/json':
