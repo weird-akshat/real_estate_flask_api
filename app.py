@@ -106,7 +106,6 @@ def search_properties():
         return jsonify(property_list), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-
 @app.route("/user_offers/<string:user_id>", methods=["GET"])
 def get_user_offers(user_id):
     try:
@@ -114,7 +113,8 @@ def get_user_offers(user_id):
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT p.*, i.image_url FROM properties p
+                SELECT DISTINCT p.*, i.image_url 
+                FROM properties p
                 JOIN offers o ON p.property_id = o.property_id
                 LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
                 WHERE o.buyer_id = ?
@@ -129,6 +129,7 @@ def get_user_offers(user_id):
             return jsonify([dict(property) for property in properties]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/get_properties_by_owner', methods=['GET'])
