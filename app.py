@@ -151,7 +151,7 @@ def delete_user(user_id):
 
 
 @app.route("/offers/<string:buyer_id>/<int:property_id>", methods=["GET"])
-def get_offers(buyer_id, property_id):
+def offers(buyer_id, property_id):
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
