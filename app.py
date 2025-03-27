@@ -67,6 +67,27 @@ def get_offers(property_id):
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/property_buyers/<int:property_id>", methods=["GET"])
+def get_property_buyers(property_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT u.user_id, u.name, u.email, u.phone FROM users u
+                JOIN offers o ON u.user_id = o.buyer_id
+                WHERE o.property_id = ?
+                """,
+                (property_id,)
+            )
+            buyers = cursor.fetchall()
+            
+            if not buyers:
+                return jsonify({"error": "No buyers found for this property"}), 404
+            
+            return jsonify([dict(buyer) for buyer in buyers]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
 
         
 @app.route('/search_properties', methods=['GET'])
