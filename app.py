@@ -448,30 +448,25 @@ def get_user_visits(user_id):
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/get_property_visitors/<int:property_id>', methods=['GET'])
-def get_property_visitors(property_id):
-    try:
-        with db_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT DISTINCT u.user_id, u.name, u.email, u.phone 
-                FROM users u
-                JOIN visits v ON u.user_id = v.user_id
-                WHERE v.property_id = ?
-                """,
-                (property_id,)
-            )
-            visitors = cursor.fetchall()
-            
-            if not visitors:
-                return jsonify({"error": "No visitors found for this property"}), 404
-            
-            return jsonify([dict(row) for row in visitors]), 200
-    except sqlite3.Error as e:
-        return jsonify({"error": str(e)}), 500
-        
+@app.route("/property/<int:property_id>/visitors", methods=["GET"])
+def get_visitors(property_id):
+    conn = db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT DISTINCT users.user_id, users.name, users.email, users.phone
+        FROM users
+        JOIN visits ON users.user_id = visits.user_id
+        WHERE visits.property_id = ?
+    """, (property_id,))
+    
+    visitors = [
+        {"user_id": row[0], "name": row[1], "email": row[2], "phone": row[3]} 
+        for row in cursor.fetchall()
+    ]
+    
+    conn.close()
+    return jsonify(visitors)
 
 @app.route('/get_visits/<int:property_id>/<user_id>', methods=['GET'])
 def get_visits(property_id, user_id):
