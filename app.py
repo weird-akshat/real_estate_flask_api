@@ -422,14 +422,16 @@ def upload_image():
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/get_user_visits/<user_id>', methods=['GET'])
 def get_user_visits(user_id):
     try:
         with db_connection() as conn:
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT DISTINCT p.property_id, p.name, p.city, p.state, p.country, i.image_url 
+                SELECT DISTINCT p.*, i.image_url 
                 FROM properties p
                 JOIN visits v ON p.property_id = v.property_id
                 LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
@@ -442,7 +444,7 @@ def get_user_visits(user_id):
             if not properties:
                 return jsonify({"error": "No properties found for this user"}), 404
             
-            return jsonify([dict(zip([column[0] for column in cursor.description], property)) for property in properties]), 200
+            return jsonify([dict(row) for row in properties]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
@@ -450,6 +452,7 @@ def get_user_visits(user_id):
 def get_property_visitors(property_id):
     try:
         with db_connection() as conn:
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -465,10 +468,10 @@ def get_property_visitors(property_id):
             if not visitors:
                 return jsonify({"error": "No visitors found for this property"}), 404
             
-            return jsonify([dict(zip([column[0] for column in cursor.description], visitor)) for visitor in visitors]), 200
+            return jsonify([dict(row) for row in visitors]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-
+        
 
 @app.route('/get_visits/<int:property_id>/<user_id>', methods=['GET'])
 def get_visits(property_id, user_id):
