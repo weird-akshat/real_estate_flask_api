@@ -421,6 +421,7 @@ def upload_image():
         }), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 @app.route('/get_user_visits/<user_id>', methods=['GET'])
 def get_user_visits(user_id):
     try:
@@ -428,7 +429,7 @@ def get_user_visits(user_id):
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT DISTINCT p.property_id, p.name, p.location, i.image_url
+                SELECT DISTINCT p.property_id, p.name, p.city, p.state, p.country, i.image_url 
                 FROM properties p
                 JOIN visits v ON p.property_id = v.property_id
                 LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
@@ -437,21 +438,11 @@ def get_user_visits(user_id):
                 (user_id,)
             )
             properties = cursor.fetchall()
-
+            
             if not properties:
                 return jsonify({"error": "No properties found for this user"}), 404
-
-            properties_list = [
-                {
-                    "property_id": row[0],
-                    "name": row[1],
-                    "location": row[2],
-                    "image_url": row[3] if row[3] else None
-                }
-                for row in properties
-            ]
             
-            return jsonify(properties_list), 200
+            return jsonify([dict(zip([column[0] for column in cursor.description], property)) for property in properties]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
@@ -470,21 +461,11 @@ def get_property_visitors(property_id):
                 (property_id,)
             )
             visitors = cursor.fetchall()
-
+            
             if not visitors:
                 return jsonify({"error": "No visitors found for this property"}), 404
-
-            visitors_list = [
-                {
-                    "user_id": row[0],
-                    "name": row[1],
-                    "email": row[2],
-                    "phone": row[3]
-                }
-                for row in visitors
-            ]
             
-            return jsonify(visitors_list), 200
+            return jsonify([dict(zip([column[0] for column in cursor.description], visitor)) for visitor in visitors]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
