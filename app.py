@@ -335,6 +335,7 @@ def create_table():
         user_id TEXT, 
         status TEXT, 
         date_and_time TEXT, 
+        made_by TEXT,
         FOREIGN KEY (user_id) REFERENCES users(user_id), 
         FOREIGN KEY (property_id) REFERENCES properties(property_id)
     );
@@ -418,6 +419,92 @@ def upload_image():
             "message": "Image uploaded successfully",
             "image_url": request.host_url + file_path
         }), 201
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_user_visits/<user_id>', methods=['GET'])
+def get_user_visits(user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT p.*, i.image_url 
+                FROM properties p
+                JOIN visits v ON p.property_id = v.property_id
+                LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
+                WHERE v.user_id = ?
+                """,
+                (user_id,)
+            )
+            properties = cursor.fetchall()
+            
+            if not properties:
+                return jsonify({"error": "No properties found for this user"}), 404
+            
+            return jsonify([dict(property) for property in properties]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_property_visitors/<int:property_id>', methods=['GET'])
+def get_property_visitors(property_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT u.user_id, u.name, u.email, u.phone FROM users u
+                JOIN visits v ON u.user_id = v.user_id
+                WHERE v.property_id = ?
+                """,
+                (property_id,)
+            )
+            visitors = cursor.fetchall()
+            
+            if not visitors:
+                return jsonify({"error": "No visitors found for this property"}), 404
+            
+            return jsonify([dict(visitor) for visitor in visitors]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_visits/<int:property_id>/<user_id>', methods=['GET'])
+def get_visits(property_id, user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM visits
+                WHERE property_id = ? AND user_id = ?
+                ORDER BY date_and_time ASC
+                """,
+                (property_id, user_id)
+            )
+            visits = cursor.fetchall()
+        
+        if not visits:
+            return jsonify({"error": "No visits found for this user and property"}), 404
+        
+        return jsonify([dict(visit) for visit in visits]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/add_visit', methods=['POST'])
+def add_visit():
+    try:
+        data = request.get_json()
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO visits (property_id, user_id, status, date_and_time, made_by)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (data['property_id'], data['user_id'], data['status'], data['date_and_time'], data['made_by'])
+            )
+            conn.commit()
+        return jsonify({"message": "Visit added successfully"}), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
