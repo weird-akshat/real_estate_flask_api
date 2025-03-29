@@ -424,33 +424,28 @@ def upload_image():
 
 
 @app.route("/user/<user_id>/visited-properties", methods=["GET"])
-def get_visited_properties(user_id):
-    conn = db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT DISTINCT properties.property_id, properties.name, properties.property_type, properties.area, 
-                        properties.parking, properties.city, properties.state, properties.country, properties.price, 
-                        properties.balcony, properties.bedrooms, properties.contact_number, properties.email, 
-                        properties.description, properties.status, 
-                        (SELECT images.image_url FROM images WHERE images.property_id = properties.property_id AND images.is_primary = 'yes' LIMIT 1) AS image_url
-        FROM properties
-        JOIN visits ON properties.property_id = visits.property_id
-        WHERE visits.user_id = ?
-    """, (user_id,))
-    
-    properties = [
-        {
-            "property_id": row[0], "name": row[1], "property_type": row[2], "area": row[3],
-            "parking": row[4], "city": row[5], "state": row[6], "country": row[7], "price": row[8],
-            "balcony": row[9], "bedrooms": row[10], "contact_number": row[11], "email": row[12],
-            "description": row[13], "status": row[14], "image_url": row[15]
-        }
-        for row in cursor.fetchall()
-    ]
-    
-    conn.close()
-    return jsonify(properties)
+def get_user_offers(user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT p.*, i.image_url 
+                FROM properties p
+                JOIN visits o ON p.property_id = o.property_id
+                LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
+                WHERE o.buyer_id = ?
+                """,
+                (user_id,)
+            )
+            properties = cursor.fetchall()
+            
+            if not properties:
+                return jsonify({"error": "No properties found for this user"}), 404
+            
+            return jsonify([dict(property) for property in properties]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/property/<int:property_id>/visitors", methods=["GET"])
 def get_visitors(property_id):
