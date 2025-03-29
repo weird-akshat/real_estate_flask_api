@@ -421,9 +421,8 @@ def upload_image():
         }), 201
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-
-@app.route("/user/<user_id>/visited-properties", methods=["GET"])
-def visited(user_id):
+@app.route("/user/<string:user_id>/visited-properties", methods=["GET"])
+def get_visited_properties(user_id):
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
@@ -431,20 +430,21 @@ def visited(user_id):
                 """
                 SELECT DISTINCT p.*, i.image_url 
                 FROM properties p
-                JOIN visits o ON p.property_id = o.property_id
+                JOIN visits v ON p.property_id = v.property_id
                 LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
-                WHERE o.buyer_id = ?
+                WHERE v.user_id = ?
                 """,
                 (user_id,)
             )
             properties = cursor.fetchall()
             
             if not properties:
-                return jsonify({"error": "No properties found for this user"}), 404
+                return jsonify({"error": "No visited properties found for this user"}), 404
             
             return jsonify([dict(property) for property in properties]), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
