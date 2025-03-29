@@ -264,42 +264,29 @@ def update_property():
         return jsonify({"message": "Property updated successfully"}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
-@app.route('/update_user', methods=['PUT'])
 def update_user():
-    if request.content_type == 'application/json':
-        data = request.get_json()
-    else:
-        return jsonify({"error": "Invalid content type"}), 400
+    data = request.get_json()
+    
+    user_id = data.get("user_id")
+    name = data.get("name")
+    phone = data.get("phone")
 
-    user_id = data.get('user_id')
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
+    if not user_id or not name or not phone:
+        return jsonify({"error": "Missing required fields"}), 400
 
-    update_fields = []
-    values = []
+    conn = db_connection()
+    cursor = conn.cursor()
 
-    allowed_fields = ["name", "email", "phone"]
+    cursor.execute("""
+        UPDATE users 
+        SET name = ?, phone = ? 
+        WHERE user_id = ?
+    """, (name, phone, user_id))
 
-    for field in allowed_fields:
-        if field in data:
-            update_fields.append(f"{field} = ?")
-            values.append(data[field])
+    conn.commit()
+    conn.close()
 
-    if not update_fields:
-        return jsonify({"error": "No valid fields to update"}), 400
-
-    values.append(user_id)
-    update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE user_id = ?"
-
-    try:
-        with db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(update_query, values)
-            conn.commit()
-        return jsonify({"message": "User updated successfully"}), 200
-    except sqlite3.Error as e:
-        return jsonify({"error": str(e)}), 500
-
+    return jsonify({"message": "User updated successfully"}), 200
 # Function to create tables
 def create_table():
     conn = db_connection()
