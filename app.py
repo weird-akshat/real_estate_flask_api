@@ -423,26 +423,29 @@ def upload_image():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/user/<user_id>/visited-properties", methods=["GET"])
-def get_visited_properties(user_id):
-    conn = db_connection()
-    cursor = conn.cursor()
+def visited(user_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT p.*, i.image_url 
+                FROM properties p
+                JOIN visits o ON p.property_id = o.property_id
+                LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'Yes'
+                WHERE o.buyer_id = ?
+                """,
+                (user_id,)
+            )
+            properties = cursor.fetchall()
+            
+            if not properties:
+                return jsonify({"error": "No properties found for this user"}), 404
+            
+            return jsonify([dict(property) for property in properties]), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
 
-    query = """
-        SELECT DISTINCT p.*, COALESCE(i.image_url, '') AS image_url
-        FROM visits v
-        JOIN properties p ON v.property_id = p.property_id
-        LEFT JOIN images i ON p.property_id = i.property_id AND i.is_primary = 'yes'
-        WHERE v.user_id = ?
-    """
-
-    cursor.execute(query, (user_id,))
-    properties = cursor.fetchall()
-    conn.close()
-
-    columns = [desc[0] for desc in cursor.description]
-    result = [dict(zip(columns, row)) for row in properties]
-
-    return jsonify(result)
 
 
 
