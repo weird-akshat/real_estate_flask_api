@@ -106,6 +106,7 @@ def search_properties():
     min_price = request.args.get('min_price', type=int)
     max_price = request.args.get('max_price', type=int)
     bedrooms = request.args.get('bedrooms', type=int)
+    area= request.args.get('area', type=int)
 
     query = "SELECT * FROM properties WHERE 1=1"
     values = []
@@ -113,6 +114,9 @@ def search_properties():
     if city:
         query += " AND city = ?"
         values.append(city)
+    if area:
+        query+=" AND area= ?"
+        values.append(area)
     if state:
         query += " AND state = ?"
         values.append(state)
