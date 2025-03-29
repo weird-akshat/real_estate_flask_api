@@ -107,10 +107,22 @@ def search_properties():
     max_price = request.args.get('max_price', type=int)
     bedrooms = request.args.get('bedrooms', type=int)
     area= request.args.get('area')
+    bathrooms= request.args.get('bathrooms', type=int)
+    parking= request.args.get('parking', type=int)
+    balcony= request.args.get('balcony', type=int)
 
     query = "SELECT * FROM properties WHERE 1=1"
     values = []
 
+    if parking:
+        query+= " AND parking=?"
+        values.append(parking)
+    if balcony:
+        query+= " AND balcony=?"
+        values.append(balcony)
+    if bathrooms:
+        query+=" AND bathrooms =?"
+        values.append(bathrooms)
     if city:
         query += " AND city = ?"
         values.append(city)
