@@ -56,7 +56,7 @@ def delete_property_by_id(property_id):
 
 @app.route('/user/<user_id>', methods=['GET'])
 def user_details(user_id):
-    conn = get_db_connection()
+    conn = db_connection()
     user = conn.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)).fetchone()
     conn.close()
     
