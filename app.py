@@ -264,6 +264,8 @@ def update_property():
         return jsonify({"message": "Property updated successfully"}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/update_user', methods=['PUT'])
 def update_user():
     data = request.get_json()
     
