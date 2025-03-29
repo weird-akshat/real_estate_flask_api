@@ -478,7 +478,7 @@ def get_visits(property_id, user_id):
                 """
                 SELECT * FROM visits
                 WHERE property_id = ? AND user_id = ?
-                ORDER BY date_and_time ASC
+                ORDER BY visit_id ASC
                 """,
                 (property_id, user_id)
             )
