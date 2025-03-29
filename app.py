@@ -103,9 +103,9 @@ def get_property_buyers(property_id):
 def search_properties():
     city = request.args.get('city')
     state = request.args.get('state')
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
-    bedrooms = request.args.get('bedrooms')
+    min_price = request.args.get('min_price', type=int)
+    max_price = request.args.get('max_price', type=int)
+    bedrooms = request.args.get('bedrooms', type=int)
 
     query = "SELECT * FROM properties WHERE 1=1"
     values = []
@@ -116,13 +116,13 @@ def search_properties():
     if state:
         query += " AND state = ?"
         values.append(state)
-    if min_price:
+    if min_price is not None:
         query += " AND price >= ?"
         values.append(min_price)
-    if max_price:
+    if max_price is not None:
         query += " AND price <= ?"
         values.append(max_price)
-    if bedrooms:
+    if bedrooms is not None:
         query += " AND bedrooms = ?"
         values.append(bedrooms)
 
@@ -136,6 +136,7 @@ def search_properties():
         return jsonify(property_list), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+
 @app.route("/user_offers/<string:user_id>", methods=["GET"])
 def get_user_offers(user_id):
     try:
