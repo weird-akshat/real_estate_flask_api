@@ -54,6 +54,15 @@ def delete_property_by_id(property_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/user/<user_id>', methods=['GET'])
+def user_details(user_id):
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE user_id = ?', (user_id,)).fetchone()
+    conn.close()
+    
+    if user:
+        return jsonify(dict(user)), 200
+    return jsonify({'error': 'User not found'}), 404
 @app.route('/get_offers/<int:property_id>', methods=['GET'])
 def get_offers(property_id):
     try:
