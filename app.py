@@ -106,7 +106,7 @@ def search_properties():
     min_price = request.args.get('min_price', type=int)
     max_price = request.args.get('max_price', type=int)
     bedrooms = request.args.get('bedrooms', type=int)
-    area= request.args.get('area', type=int)
+    area= request.args.get('area')
 
     query = "SELECT * FROM properties WHERE 1=1"
     values = []
