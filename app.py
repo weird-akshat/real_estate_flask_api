@@ -331,7 +331,7 @@ def create_table():
         city TEXT, 
         state TEXT, 
         country TEXT, 
-        price TEXT, 
+        price REAL, 
         balcony TEXT, 
         bedrooms TEXT, 
         contact_number TEXT, 
