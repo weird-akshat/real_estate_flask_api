@@ -154,6 +154,27 @@ def search_properties():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/update_visit_status/<int:visit_id>', methods=['PUT'])
+def update_visit_status(visit_id):
+    conn = db_connection()
+    cursor = conn.cursor()
+
+    # Update visit status to 'confirmed' where visit_id matches
+    cursor.execute("""
+        UPDATE visits
+        SET status = 'confirmed'
+        WHERE visit_id = ?
+    """, (visit_id,))
+    
+    conn.commit()
+
+    # Check if the update was successful
+    if cursor.rowcount == 0:
+        return jsonify({"error": "Visit not found"}), 404
+
+    return jsonify({"message": "Visit status updated to confirmed"}), 200
+
+
 @app.route('/accept_offer/<int:offer_id>', methods=['PUT'])
 def accept_offer(offer_id):
     try:
