@@ -106,31 +106,31 @@ def search_properties():
     min_price = request.args.get('min_price', type=int)
     max_price = request.args.get('max_price', type=int)
     bedrooms = request.args.get('bedrooms', type=int)
-    area= request.args.get('area')
-    bathrooms= request.args.get('bathrooms', type=int)
-    parking= request.args.get('parking', type=int)
-    balcony= request.args.get('balcony', type=int)
+    area = request.args.get('area')
+    bathrooms = request.args.get('bathrooms', type=int)
+    parking = request.args.get('parking', type=int)
+    balcony = request.args.get('balcony', type=int)
 
-    query = "SELECT * FROM properties WHERE 1=1"
+    query = "SELECT * FROM properties WHERE status = 'Available'"
     values = []
 
     if parking:
-        query+= " AND parking=?"
+        query += " AND parking=?"
         values.append(parking)
     if balcony:
-        query+= " AND balcony=?"
+        query += " AND balcony=?"
         values.append(balcony)
     if bathrooms:
-        query+=" AND bathrooms =?"
+        query += " AND bathrooms=?"
         values.append(bathrooms)
     if city:
-        query += " AND city = ?"
+        query += " AND city=?"
         values.append(city)
     if area:
-        query+=" AND area= ?"
+        query += " AND area=?"
         values.append(area)
     if state:
-        query += " AND state = ?"
+        query += " AND state=?"
         values.append(state)
     if min_price is not None:
         query += " AND price >= ?"
@@ -139,7 +139,7 @@ def search_properties():
         query += " AND price <= ?"
         values.append(max_price)
     if bedrooms is not None:
-        query += " AND bedrooms = ?"
+        query += " AND bedrooms=?"
         values.append(bedrooms)
 
     try:
