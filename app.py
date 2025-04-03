@@ -153,6 +153,25 @@ def search_properties():
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/accept_offer/<int:offer_id>', methods=['PUT'])
+def accept_offer(offer_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT * FROM offers WHERE offer_id = ?", (offer_id,))
+            offer = cursor.fetchone()
+            if not offer:
+                return jsonify({"error": "Offer not found"}), 404
+            
+            cursor.execute("UPDATE offers SET offer_status = 'Accepted' WHERE offer_id = ?", (offer_id,))
+            conn.commit()
+
+        return jsonify({"message": "Offer accepted successfully"}), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/user_offers/<string:user_id>", methods=["GET"])
 def get_user_offers(user_id):
     try:
