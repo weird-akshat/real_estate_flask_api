@@ -196,6 +196,7 @@ def get_properties_by_owner():
         return jsonify(property_list), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
+        
 @app.route('/delete_user/<string:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     try:
@@ -216,6 +217,36 @@ def delete_user(user_id):
             conn.commit()
 
         return jsonify({"message": "User deleted successfully", "deleted_user": user_data}), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+@app.route('/is_property_sold/<int:property_id>', methods=['GET'])
+def is_property_sold(property_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT status FROM properties WHERE property_id = ?", (property_id,))
+            property_status = cursor.fetchone()
+
+            if not property_status:
+                return jsonify({"error": "Property not found"}), 404
+
+            return jsonify({"property_id": property_id, "sold": property_status["status"].lower() == "sold"}), 200
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/mark_property_sold/<int:property_id>', methods=['PUT'])
+def mark_property_sold(property_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE properties SET status = 'sold' WHERE property_id = ?", (property_id,))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                return jsonify({"error": "Property not found or already sold"}), 404
+
+        return jsonify({"message": "Property marked as sold"}), 200
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
