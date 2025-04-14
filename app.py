@@ -20,7 +20,7 @@ def db_connection():
         database_url = os.environ.get('DATABASE_URL')
         if not database_url:
             # Fallback for local development
-            database_url = "postgresql://real_estate_t1w1_user:CJZQYoeUZdi2rzUkk1siTd0b6QOqViJL@dpg-cvu0s5juibrs73eh2kkg-a.oregon-postgres.render.com/real_estate_t1w1"
+            database_url = "postgresql://postgres:rems@db.cmhffuysnjuhrltzlapq.supabase.co:5432/postgres"
         
         conn = psycopg2.connect(database_url)
         conn.autocommit = False  # For transaction control
