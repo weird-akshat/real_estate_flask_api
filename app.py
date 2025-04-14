@@ -18,9 +18,9 @@ def db_connection():
     try:
         # Get database URL from environment variable for Render
         database_url = os.environ.get('DATABASE_URL')
-        # if not database_url:
+        if not database_url:
             # Fallback for local development
-            # database_url = "postgresql://real_estate_1gxy_user:kmGTDSSqiUPpGUTPEb898MboFTq4wrzD@dpg-cvujv724d50c73b1q54g-a.oregon-postgres.render.com/real_estate_1gxy"
+            database_url = "postgresql://real_estate_1gxy_user:kmGTDSSqiUPpGUTPEb898MboFTq4wrzD@dpg-cvujv724d50c73b1q54g-a.oregon-postgres.render.com/real_estate_1gxy"
         
         conn = psycopg2.connect(database_url)
         conn.autocommit = False  # For transaction control
@@ -116,6 +116,221 @@ def create_tables():
         FOREIGN KEY (property_id) REFERENCES properties(property_id), 
         FOREIGN KEY (buyer_id) REFERENCES users(user_id)
     );
+    """)
+
+    # Create logs table for triggers
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS operation_logs (
+        log_id SERIAL PRIMARY KEY,
+        table_name TEXT NOT NULL,
+        operation_type TEXT NOT NULL,
+        record_id TEXT NOT NULL,
+        user_id TEXT,
+        operation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        details TEXT
+    );
+    """)
+
+    # Create PL/pgSQL procedures
+    # Procedure 1: Add or update user
+    cursor.execute("""
+    CREATE OR REPLACE PROCEDURE upsert_user(
+        p_user_id TEXT,
+        p_name TEXT,
+        p_email TEXT,
+        p_phone TEXT
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        -- Check if user exists
+        IF EXISTS (SELECT 1 FROM users WHERE user_id = p_user_id) THEN
+            -- Update existing user
+            UPDATE users 
+            SET name = p_name, email = p_email, phone = p_phone
+            WHERE user_id = p_user_id;
+        ELSE
+            -- Insert new user
+            INSERT INTO users (user_id, name, email, phone)
+            VALUES (p_user_id, p_name, p_email, p_phone);
+        END IF;
+    END;
+    $$;
+    """)
+
+    # Procedure 2: Add property with validation
+    cursor.execute("""
+    CREATE OR REPLACE PROCEDURE add_property_proc(
+        p_name TEXT,
+        p_owner_id TEXT,
+        p_property_type TEXT,
+        p_area TEXT,
+        p_parking TEXT,
+        p_city TEXT,
+        p_state TEXT,
+        p_country TEXT,
+        p_price FLOAT,
+        p_balcony TEXT,
+        p_bedrooms TEXT,
+        p_contact_number TEXT,
+        p_email TEXT,
+        p_description TEXT,
+        p_status TEXT,
+        INOUT p_property_id INTEGER DEFAULT NULL
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        -- Validate owner existence
+        IF NOT EXISTS (SELECT 1 FROM users WHERE user_id = p_owner_id) THEN
+            RAISE EXCEPTION 'Owner with ID % does not exist', p_owner_id;
+        END IF;
+        
+        -- Validate price
+        IF p_price <= 0 THEN
+            RAISE EXCEPTION 'Price must be greater than zero';
+        END IF;
+        
+        -- Insert the property
+        INSERT INTO properties (
+            name, owner_id, property_type, area, parking, city, 
+            state, country, price, balcony, bedrooms, 
+            contact_number, email, description, status
+        ) VALUES (
+            p_name, p_owner_id, p_property_type, p_area, p_parking, p_city,
+            p_state, p_country, p_price, p_balcony, p_bedrooms,
+            p_contact_number, p_email, p_description, p_status
+        ) RETURNING property_id INTO p_property_id;
+    END;
+    $$;
+    """)
+
+    # Procedure 3: Process property offer
+    cursor.execute("""
+    CREATE OR REPLACE PROCEDURE process_offer(
+        p_property_id INTEGER,
+        p_buyer_id TEXT,
+        p_amount FLOAT,
+        p_made_by TEXT,
+        INOUT p_offer_id INTEGER DEFAULT NULL
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        -- Validate property
+        IF NOT EXISTS (SELECT 1 FROM properties WHERE property_id = p_property_id) THEN
+            RAISE EXCEPTION 'Property with ID % does not exist', p_property_id;
+        END IF;
+        
+        -- Validate buyer
+        IF NOT EXISTS (SELECT 1 FROM users WHERE user_id = p_buyer_id) THEN
+            RAISE EXCEPTION 'User with ID % does not exist', p_buyer_id;
+        END IF;
+        
+        -- Validate amount
+        IF p_amount <= 0 THEN
+            RAISE EXCEPTION 'Offer amount must be greater than zero';
+        END IF;
+        
+        -- Check if property is available
+        IF EXISTS (SELECT 1 FROM properties WHERE property_id = p_property_id AND status = 'sold') THEN
+            RAISE EXCEPTION 'Cannot make offer on sold property';
+        END IF;
+        
+        -- Create the offer
+        INSERT INTO offers (property_id, buyer_id, amount, offer_status, made_by)
+        VALUES (p_property_id, p_buyer_id, p_amount, 'Pending', p_made_by)
+        RETURNING offer_id INTO p_offer_id;
+    END;
+    $$;
+    """)
+
+    # Procedure 4: Handle property sale
+    cursor.execute("""
+    CREATE OR REPLACE PROCEDURE sell_property(
+        p_property_id INTEGER,
+        p_offer_id INTEGER
+    )
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        v_property_exists BOOLEAN;
+        v_offer_exists BOOLEAN;
+    BEGIN
+        -- Check if property exists
+        SELECT EXISTS(SELECT 1 FROM properties WHERE property_id = p_property_id) INTO v_property_exists;
+        IF NOT v_property_exists THEN
+            RAISE EXCEPTION 'Property with ID % does not exist', p_property_id;
+        END IF;
+        
+        -- Check if offer exists
+        SELECT EXISTS(SELECT 1 FROM offers WHERE offer_id = p_offer_id AND property_id = p_property_id) INTO v_offer_exists;
+        IF NOT v_offer_exists THEN
+            RAISE EXCEPTION 'Offer with ID % for property % does not exist', p_offer_id, p_property_id;
+        END IF;
+        
+        -- Update property status
+        UPDATE properties SET status = 'sold' WHERE property_id = p_property_id;
+        
+        -- Update offer status
+        UPDATE offers SET offer_status = 'Accepted' WHERE offer_id = p_offer_id;
+        
+        -- Reject other offers for this property
+        UPDATE offers 
+        SET offer_status = 'Rejected' 
+        WHERE property_id = p_property_id AND offer_id != p_offer_id AND offer_status = 'Pending';
+    END;
+    $$;
+    """)
+
+    # Create trigger for logging property status changes
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION log_property_status_change()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+            INSERT INTO operation_logs (
+                table_name, operation_type, record_id, details
+            ) VALUES (
+                'properties', 'status_change', NEW.property_id::TEXT,
+                'Status changed from ' || COALESCE(OLD.status, 'NULL') || ' to ' || COALESCE(NEW.status, 'NULL')
+            );
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """)
+
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS property_status_change_trigger ON properties;
+    CREATE TRIGGER property_status_change_trigger
+    AFTER UPDATE ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION log_property_status_change();
+    """)
+
+    # Create trigger for logging new offers
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION log_new_offer()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        INSERT INTO operation_logs (
+            table_name, operation_type, record_id, user_id, details
+        ) VALUES (
+            'offers', 'new_offer', NEW.offer_id::TEXT, NEW.buyer_id,
+            'New offer of $' || NEW.amount::TEXT || ' for property ID ' || NEW.property_id::TEXT
+        );
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """)
+
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS new_offer_trigger ON offers;
+    CREATE TRIGGER new_offer_trigger
+    AFTER INSERT ON offers
+    FOR EACH ROW
+    EXECUTE FUNCTION log_new_offer();
     """)
 
     conn.commit()
@@ -282,17 +497,21 @@ def accept_offer(offer_id):
         conn = db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        cursor.execute("SELECT * FROM offers WHERE offer_id = %s", (offer_id,))
+        # Get the property_id for the offer
+        cursor.execute("SELECT property_id FROM offers WHERE offer_id = %s", (offer_id,))
         offer = cursor.fetchone()
         if not offer:
             conn.close()
             return jsonify({"error": "Offer not found"}), 404
         
-        cursor.execute("UPDATE offers SET offer_status = 'Accepted' WHERE offer_id = %s", (offer_id,))
+        property_id = offer['property_id']
+        
+        # Use the stored procedure to accept the offer and mark property as sold
+        cursor.execute("CALL sell_property(%s, %s)", (property_id, offer_id))
         conn.commit()
         conn.close()
 
-        return jsonify({"message": "Offer accepted successfully"}), 200
+        return jsonify({"message": "Offer accepted successfully and property marked as sold"}), 200
     except psycopg2.Error as e:
         return jsonify({"error": str(e)}), 500
 
@@ -384,6 +603,7 @@ def mark_property_sold(property_id):
     try:
         conn = db_connection()
         cursor = conn.cursor()
+        # This update will trigger the property_status_change_trigger
         cursor.execute("UPDATE properties SET status = 'sold' WHERE property_id = %s", (property_id,))
         conn.commit()
 
@@ -426,6 +646,7 @@ def update_user():
     user_id = data.get("user_id")
     name = data.get("name")
     phone = data.get("phone")
+    email = data.get("email", "")  # Add email with default empty value
 
     if not user_id or not name or not phone:
         return jsonify({"error": "Missing required fields"}), 400
@@ -433,13 +654,9 @@ def update_user():
     try:
         conn = db_connection()
         cursor = conn.cursor()
-
-        cursor.execute("""
-            UPDATE users 
-            SET name = %s, phone = %s 
-            WHERE user_id = %s
-        """, (name, phone, user_id))
-
+        
+        # Use the stored procedure to update user
+        cursor.execute("CALL upsert_user(%s, %s, %s, %s)", (user_id, name, email, phone))
         conn.commit()
         conn.close()
 
@@ -678,25 +895,20 @@ def make_offer():
         conn = db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT 1 FROM properties WHERE property_id = %s", (data["property_id"],))
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({"error": "Property not found"}), 404
-
-        cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (data["buyer_id"],))
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({"error": "User not found"}), 404
-
-        cursor.execute("""
-            INSERT INTO offers (property_id, buyer_id, amount, offer_status, made_by) 
-            VALUES (%s, %s, %s, %s, %s)
-        """, (data["property_id"], data["buyer_id"], data["amount"], "Pending", data["made_by"]))
-
+        # Use the stored procedure to process offer
+        offer_id = None
+        cursor.execute(
+            "CALL process_offer(%s, %s, %s, %s, %s)",
+            (data["property_id"], data["buyer_id"], data["amount"], data["made_by"], offer_id)
+        )
+        
+        # Get the returned offer_id
+        offer_id = cursor.fetchone()[0] if cursor.description else None
+        
         conn.commit()
         conn.close()
         
-        return jsonify({"message": "Offer submitted successfully"}), 201
+        return jsonify({"message": "Offer submitted successfully", "offer_id": offer_id}), 201
     except psycopg2.Error as e:
         return jsonify({"error": str(e)}), 500
 
@@ -718,8 +930,13 @@ def createUser():
     try:
         conn = db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (user_id, name, email, phone) VALUES (%s, %s, %s, %s)", 
-                       (data['user_id'], data['name'], data['email'], data['phone']))
+        
+        # Use the stored procedure for user creation
+        cursor.execute(
+            "CALL upsert_user(%s, %s, %s, %s)",
+            (data['user_id'], data['name'], data['email'], data['phone'])
+        )
+        
         conn.commit()
         conn.close()
         
@@ -744,16 +961,23 @@ def add_property():
     try:
         conn = db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO properties (name, owner_id, property_type, area, parking, city, state, country, price, 
-                                   balcony, bedrooms, contact_number, email, description, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING property_id
-        """, (data['name'], data['owner_id'], data['property_type'], data['area'], data.get('parking'),
-              data['city'], data['state'], data['country'], data['price'], 
-              data.get('balcony'), data.get('bedrooms'), data['contact_number'], 
-              data['email'], data.get('description'), data['status']))
         
-        property_id = cursor.fetchone()[0]
+        # Use the stored procedure to add a property
+        property_id = None
+        cursor.execute(
+            "CALL add_property_proc(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                data['name'], data['owner_id'], data['property_type'], data['area'], 
+                data.get('parking'), data['city'], data['state'], data['country'], 
+                data['price'], data.get('balcony'), data.get('bedrooms'), 
+                data['contact_number'], data['email'], data.get('description'), 
+                data['status'], property_id
+            )
+        )
+        
+        # Get the returned property_id
+        property_id = cursor.fetchone()[0] if cursor.description else None
+        
         conn.commit()
         conn.close()
         
@@ -814,6 +1038,42 @@ def add_favorite():
         return jsonify({"message": "Property added to favorites"}), 201
     except psycopg2.IntegrityError:
         return jsonify({"error": "Property already in favorites"}), 409
+    except psycopg2.Error as e:
+        return jsonify({"error": str(e)}), 500
+
+# New endpoint to view logs
+@app.route('/operation_logs', methods=['GET'])
+def get_operation_logs():
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Optional filters
+        table_name = request.args.get('table_name')
+        operation_type = request.args.get('operation_type')
+        
+        query = "SELECT * FROM operation_logs"
+        params = []
+        where_clauses = []
+        
+        if table_name:
+            where_clauses.append("table_name = %s")
+            params.append(table_name)
+            
+        if operation_type:
+            where_clauses.append("operation_type = %s")
+            params.append(operation_type)
+            
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+            
+        query += " ORDER BY operation_timestamp DESC"
+        
+        cursor.execute(query, params)
+        logs = cursor.fetchall()
+        conn.close()
+        
+        return jsonify([dict(log) for log in logs]), 200
     except psycopg2.Error as e:
         return jsonify({"error": str(e)}), 500
 
