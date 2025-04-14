@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, g, send_file
+pfrom flask import Flask, request, jsonify, g, send_file
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -147,7 +147,7 @@ def create_tables():
         IF EXISTS (SELECT 1 FROM users WHERE user_id = p_user_id) THEN
             -- Update existing user
             UPDATE users 
-            SET name = p_name, email = p_email, phone = p_phone
+            SET name = p_name, phone = p_phone
             WHERE user_id = p_user_id;
         ELSE
             -- Insert new user
