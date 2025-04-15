@@ -19,8 +19,8 @@ def db_connection():
         # Get database URL from environment variable for Render
         database_url = os.environ.get('DATABASE_URL')
         if not database_url:
-            # Fallback for local development
-            database_url = "postgresql://real_estate_1gxy_user:kmGTDSSqiUPpGUTPEb898MboFTq4wrzD@dpg-cvujv724d50c73b1q54g-a.oregon-postgres.render.com/real_estate_1gxy"
+            # Supabase database connection string
+            database_url = "postgresql://postgres:rems@db.cmhffuysnjuhrltzlapq.supabase.co:5432/postgres"
         
         conn = psycopg2.connect(database_url)
         conn.autocommit = False  # For transaction control
