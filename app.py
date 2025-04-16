@@ -32,104 +32,96 @@ def db_connection():
 def create_tables():
     conn = db_connection()
     cursor = conn.cursor()
-
-    # Users table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        user_id TEXT PRIMARY KEY, 
-        name TEXT, 
-        email TEXT, 
-        phone TEXT
-    );
-    """)
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY, 
+    name TEXT NOT NULL, 
+    email TEXT NOT NULL, 
+    phone TEXT NOT NULL
+);
+""")
 
-    # Properties table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS properties (
-        property_id SERIAL PRIMARY KEY, 
-        name TEXT,
-        owner_id TEXT, 
-        property_type TEXT, 
-        area TEXT, 
-        parking TEXT, 
-        city TEXT, 
-        state TEXT, 
-        country TEXT, 
-        price FLOAT, 
-        balcony TEXT, 
-        bedrooms TEXT, 
-        contact_number TEXT, 
-        email TEXT, 
-        description TEXT, 
-        status TEXT, 
-        FOREIGN KEY (owner_id) REFERENCES users(user_id)
-    );
-    """)
+CREATE TABLE IF NOT EXISTS properties (
+    property_id SERIAL PRIMARY KEY, 
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL, 
+    property_type TEXT NOT NULL, 
+    area TEXT NOT NULL, 
+    parking TEXT NOT NULL, 
+    city TEXT NOT NULL, 
+    state TEXT NOT NULL, 
+    country TEXT NOT NULL, 
+    price FLOAT NOT NULL, 
+    balcony TEXT,
+    bedrooms TEXT NOT NULL, 
+    contact_number TEXT NOT NULL, 
+    email TEXT NOT NULL, 
+    description TEXT,
+    status TEXT NOT NULL, 
+    FOREIGN KEY (owner_id) REFERENCES users(user_id)
+);
+""")
 
-    # Visits table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS visits (
-        visit_id SERIAL PRIMARY KEY, 
-        property_id INTEGER, 
-        user_id TEXT, 
-        status TEXT, 
-        date_and_time TEXT, 
-        made_by TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(user_id), 
-        FOREIGN KEY (property_id) REFERENCES properties(property_id)
-    );
-    """)
+CREATE TABLE IF NOT EXISTS visits (
+    visit_id SERIAL PRIMARY KEY, 
+    property_id INTEGER NOT NULL, 
+    user_id TEXT NOT NULL, 
+    status TEXT NOT NULL, 
+    date_and_time TEXT NOT NULL, 
+    made_by TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id), 
+    FOREIGN KEY (property_id) REFERENCES properties(property_id)
+);
+""")
 
-    # Images table - modified to store binary data directly
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS images (
-        image_id SERIAL PRIMARY KEY, 
-        property_id INTEGER, 
-        image_data BYTEA, 
-        image_type TEXT,
-        is_primary TEXT, 
-        FOREIGN KEY (property_id) REFERENCES properties(property_id)
-    );
-    """)
+CREATE TABLE IF NOT EXISTS images (
+    image_id SERIAL PRIMARY KEY, 
+    property_id INTEGER NOT NULL, 
+    image_data BYTEA NOT NULL, 
+    image_type TEXT NOT NULL,
+    is_primary TEXT NOT NULL, 
+    FOREIGN KEY (property_id) REFERENCES properties(property_id)
+);
+""")
 
-    # Favorites table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS favorites (
-        user_id TEXT, 
-        property_id INTEGER,  
-        FOREIGN KEY (property_id) REFERENCES properties(property_id),
-        FOREIGN KEY (user_id) REFERENCES users(user_id),
-        PRIMARY KEY (user_id, property_id)
-    );
-    """)
+CREATE TABLE IF NOT EXISTS favorites (
+    user_id TEXT NOT NULL, 
+    property_id INTEGER NOT NULL,  
+    FOREIGN KEY (property_id) REFERENCES properties(property_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    PRIMARY KEY (user_id, property_id)
+);
+""")
 
-    # Offers table
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS offers (
-        offer_id SERIAL PRIMARY KEY, 
-        property_id INTEGER, 
-        buyer_id TEXT, 
-        amount FLOAT, 
-        offer_status TEXT, 
-        offer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-        made_by TEXT CHECK(made_by IN ('buyer', 'owner')), 
-        FOREIGN KEY (property_id) REFERENCES properties(property_id), 
-        FOREIGN KEY (buyer_id) REFERENCES users(user_id)
-    );
-    """)
+CREATE TABLE IF NOT EXISTS offers (
+    offer_id SERIAL PRIMARY KEY, 
+    property_id INTEGER NOT NULL, 
+    buyer_id TEXT NOT NULL, 
+    amount FLOAT NOT NULL, 
+    offer_status TEXT NOT NULL, 
+    offer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    made_by TEXT NOT NULL CHECK(made_by IN ('buyer', 'owner')), 
+    FOREIGN KEY (property_id) REFERENCES properties(property_id), 
+    FOREIGN KEY (buyer_id) REFERENCES users(user_id)
+);
+""")
 
-    # Create logs table for triggers
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS operation_logs (
-        log_id SERIAL PRIMARY KEY,
-        table_name TEXT NOT NULL,
-        operation_type TEXT NOT NULL,
-        record_id TEXT NOT NULL,
-        user_id TEXT,
-        operation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        details TEXT
-    );
-    """)
+CREATE TABLE IF NOT EXISTS operation_logs (
+    log_id SERIAL PRIMARY KEY,
+    table_name TEXT NOT NULL,
+    operation_type TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    user_id TEXT,
+    operation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    details TEXT
+);
+""")
 
     # Create PL/pgSQL procedures
     # Procedure 1: Add or update user
