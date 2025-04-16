@@ -28,7 +28,6 @@ def db_connection():
         print(e)
     return conn
 
-# Create tables function
 def create_tables():
     conn = db_connection()
     cursor = conn.cursor()
@@ -58,7 +57,7 @@ CREATE TABLE IF NOT EXISTS properties (
     contact_number TEXT NOT NULL, 
     email TEXT NOT NULL, 
     description TEXT,
-    status TEXT NOT NULL, 
+        status TEXT NOT NULL CHECK (status IN ('Available', 'Sold')), 
     FOREIGN KEY (owner_id) REFERENCES users(user_id)
 );
 """)
@@ -68,7 +67,7 @@ CREATE TABLE IF NOT EXISTS visits (
     visit_id SERIAL PRIMARY KEY, 
     property_id INTEGER NOT NULL, 
     user_id TEXT NOT NULL, 
-    status TEXT NOT NULL, 
+    status TEXT NOT NULL CHECK (status IN ('request', 'confirmed')), 
     date_and_time TEXT NOT NULL, 
     made_by TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(user_id), 
@@ -103,7 +102,7 @@ CREATE TABLE IF NOT EXISTS offers (
     property_id INTEGER NOT NULL, 
     buyer_id TEXT NOT NULL, 
     amount FLOAT NOT NULL, 
-    offer_status TEXT NOT NULL, 
+    offer_status TEXT NOT NULL CHECK (offer_status IN ('Pending', 'Accepted', 'Rejected')),
     offer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
     made_by TEXT NOT NULL CHECK(made_by IN ('buyer', 'owner')), 
     FOREIGN KEY (property_id) REFERENCES properties(property_id), 
@@ -310,7 +309,7 @@ CREATE TABLE IF NOT EXISTS operation_logs (
             table_name, operation_type, record_id, user_id, details
         ) VALUES (
             'offers', 'new_offer', NEW.offer_id::TEXT, NEW.buyer_id,
-            'New offer of $' || NEW.amount::TEXT || ' for property ID ' || NEW.property_id::TEXT
+            'New offer of ' || NEW.amount::TEXT || ' for property ID ' || NEW.property_id::TEXT
         );
         RETURN NEW;
     END;
@@ -324,6 +323,83 @@ CREATE TABLE IF NOT EXISTS operation_logs (
     FOR EACH ROW
     EXECUTE FUNCTION log_new_offer();
     """)
+
+    # Create function for logging property insertions
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION log_property_insertion()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        INSERT INTO operation_logs (
+            table_name, operation_type, record_id, user_id, details
+        ) VALUES (
+            'properties', 'insertion', NEW.property_id::TEXT, NEW.owner_id,
+            'New property added with name: ' || COALESCE(NEW.name, 'NULL') || ' and status: ' || COALESCE(NEW.status, 'NULL')
+        );
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """)
+
+    # Create trigger for property insertions
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS property_insertion_trigger ON properties;
+    CREATE TRIGGER property_insertion_trigger
+    AFTER INSERT ON properties
+    FOR EACH ROW
+    EXECUTE FUNCTION log_property_insertion();
+    """)
+
+    # NEW VISIT TRIGGER - Create trigger for logging new visits
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION log_new_visit()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        INSERT INTO operation_logs (
+            table_name, operation_type, record_id, user_id, details
+        ) VALUES (
+            'visits', 'new_visit', NEW.visit_id::TEXT, NEW.user_id,
+            'New visit scheduled for property ID ' || NEW.property_id::TEXT || ' on ' || NEW.date_and_time || ' with status: ' || NEW.status
+        );
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """)
+
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS new_visit_trigger ON visits;
+    CREATE TRIGGER new_visit_trigger
+    AFTER INSERT ON visits
+    FOR EACH ROW
+    EXECUTE FUNCTION log_new_visit();
+    """)
+
+    # NEW VISIT STATUS UPDATE TRIGGER - Create trigger for logging visit status updates
+    cursor.execute("""
+    CREATE OR REPLACE FUNCTION log_visit_status_change()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+            INSERT INTO operation_logs (
+                table_name, operation_type, record_id, user_id, details
+            ) VALUES (
+                'visits', 'status_change', NEW.visit_id::TEXT, NEW.user_id,
+                'Visit status changed from ' || COALESCE(OLD.status, 'NULL') || ' to ' || COALESCE(NEW.status, 'NULL') || 
+                ' for property ID ' || NEW.property_id::TEXT
+            );
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    """)
+
+    cursor.execute("""
+    DROP TRIGGER IF EXISTS visit_status_change_trigger ON visits;
+    CREATE TRIGGER visit_status_change_trigger
+    AFTER UPDATE ON visits
+    FOR EACH ROW
+    EXECUTE FUNCTION log_visit_status_change();
+    """)
+
 
     conn.commit()
     conn.close()
